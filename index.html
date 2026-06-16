@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rastreador OBGE</title>
+
+    <link rel="icon" href="icon-icons.png" type="image/png">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ================= VARIÁVEIS DE TEMA ================= */
+        :root {
+            /* Modo Claro */
+            --bg-gradient: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+            --text-main: #0f172a;       
+            --text-muted: #475569;      
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --table-hover: rgba(56, 189, 248, 0.1);
+            --map-trace: #2563eb;       
+            --map-trace-glow: #1d4ed8;
+            --glow-color-1: rgba(56, 189, 248, 0.4);
+            --glow-color-2: rgba(37, 99, 235, 0.2);
+        }
+
+        [data-theme="dark"] {
+            /* Modo Escuro */
+            --bg-gradient: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+            --text-main: #f8fafc;       
+            --text-muted: #94a3b8;      
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(56, 189, 248, 0.15);
+            --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            --table-hover: rgba(56, 189, 248, 0.15);
+            --map-trace: #38bdf8;       
+            --map-trace-glow: #0284c7;
+            --glow-color-1: rgba(56, 189, 248, 0.5);
+            --glow-color-2: rgba(37, 99, 235, 0.3);
+        }
+
+        /* ================= ESTILOS GLOBAIS ================= */
+        * {
+            transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6, p, span, div, td, th { color: var(--text-main); }
+        .text-muted { color: var(--text-muted) !important; }
+
+        /* Navbar Customizada */
+        .navbar-custom {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+            box-shadow: var(--card-shadow);
+            padding: 15px 0;
+            z-index: 1000;
+        }
+        .navbar-brand { font-weight: 700; color: #38bdf8 !important; font-size: 1.4rem; letter-spacing: 1px; }
+        .navbar-brand i { color: var(--text-main); }
+
+        /* Botão Theme Toggle Fluido */
+        .theme-btn {
+            background: rgba(56, 189, 248, 0.15);
+            border: 1px solid var(--glass-border);
+            color: #38bdf8 !important;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+        .theme-btn:hover { 
+            background: #38bdf8; 
+            color: #ffffff !important; 
+            transform: rotate(30deg) scale(1.15); 
+            box-shadow: 0 0 20px var(--glow-color-1); 
+        }
+
+        /* ================= GLASSMORPHISM E BRILHO ================= */
+        .glass-wrapper {
+            position: relative;
+            border-radius: 24px;
+            z-index: 1;
+        }
+
+        .glass-wrapper::before {
+            content: "";
+            position: absolute;
+            top: -3px; left: -3px; right: -3px; bottom: -3px;
+            background: linear-gradient(90deg, var(--glow-color-1), var(--glow-color-2), var(--glow-color-1), var(--glow-color-2));
+            background-size: 400% 400%;
+            border-radius: 26px;
+            z-index: -1;
+            filter: blur(12px);
+            animation: passingGlow 8s ease-in-out infinite;
+            opacity: 0.8;
+            transition: opacity 0.4s;
+        }
+        .glass-wrapper:hover::before { opacity: 1; filter: blur(16px); }
+
+        @keyframes passingGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .card-header-glass {
+            background: rgba(0,0,0,0.03);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 18px 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        [data-theme="dark"] .card-header-glass { background: rgba(255,255,255,0.02); }
+
+        /* ================= UPLOAD AREA ================= */
+        .upload-zone {
+            border: 2px dashed #38bdf8;
+            border-radius: 24px;
+            padding: 60px 20px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background: rgba(56, 189, 248, 0.05);
+            position: relative;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: #2563eb;
+            transform: scale(1.03);
+        }
+        .upload-icon { 
+            font-size: 4.5rem; 
+            color: #38bdf8; 
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+            100% { transform: translateY(0px); }
+        }
+
+        /* ================= STATS CARDS ================= */
+        .stat-widget { padding: 24px; display: flex; align-items: center; gap: 20px; }
+        .stat-icon-wrapper {
+            width: 65px; height: 65px;
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; color: #fff;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+        }
+        .stat-icon-wrapper.time { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); }
+        .stat-icon-wrapper.speed { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
+        .stat-icon-wrapper.alt { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .stat-icon-wrapper.sat { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        
+        .stat-info h6 { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600; }
+        .stat-info h3 { font-size: 1.8rem; font-weight: 700; margin: 0; color: var(--text-main); }
+
+        /* ================= MAPA & CONTROLES TELA CHEIA ================= */
+        #mapWrapper {
+            position: relative;
+            background: #e5e5e5;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            z-index: 1;
+        }
+        #mapWrapper:fullscreen {
+            border-radius: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+        
+        #map { height: 100%; width: 100%; flex-grow: 1; }
+
+        /* Botão para Sair da Tela Cheia */
+        #btnExitFullscreen {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        #mapWrapper:fullscreen #btnExitFullscreen {
+            display: inline-flex !important;
+        }
+
+        /* ================= FIX DEFINITIVO: BOTÕES DE ZOOM PRETOS ================= */
+        /* Ignora regras globais do modo escuro e trava a cor em preto com fundo branco */
+        .leaflet-control-zoom a, 
+        [data-theme="dark"] .leaflet-control-zoom a {
+            color: #000000 !important; 
+            background-color: #ffffff !important;
+            font-weight: bold !important;
+            text-shadow: none !important;
+        }
+        .leaflet-control-zoom a:hover, 
+        [data-theme="dark"] .leaflet-control-zoom a:hover {
+            background-color: #f4f4f4 !important;
+            color: #000000 !important;
+        }
+        
+        /* Estilos de Tooltip do Leaflet */
+        .leaflet-tooltip-own { 
+            background: var(--glass-bg) !important; 
+            backdrop-filter: blur(12px) !important; 
+            border: 1px solid var(--glass-border) !important; 
+            color: var(--text-main) !important; 
+            box-shadow: var(--card-shadow) !important; 
+            border-radius: 12px !important;
+            padding: 10px 15px !important;
+        }
+
+        /* ================= TABELA E COMPONENTES ================= */
+        .table-custom th { background: transparent; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid var(--glass-border); padding: 15px; }
+        .table-custom td { border-color: var(--glass-border); background: transparent; vertical-align: middle; padding: 12px 15px; color: var(--text-main); }
+        .table-custom tbody tr { transition: background 0.3s, transform 0.2s; }
+        .table-custom tbody tr:hover { background: var(--table-hover); transform: scale(1.01); }
+        
+        .badge-neon { padding: 8px 14px; border-radius: 10px; font-weight: 600; }
+        .badge-neon.green { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+        .badge-neon.yellow { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+        .badge-neon.blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.4); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+
+        /* Animações de Entrada */
+        .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; opacity: 0; transform: translateY(40px); }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+
+        /* ================= FOOTER ================= */
+        .footer-custom {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid var(--glass-border);
+            padding: 25px 0;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-custom sticky-top">
+        <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="fas fa-satellite-dish fs-3"></i>
+                <span>OBGE <span class="fw-light text-muted">| Analytics</span></span>
+            </a>
+            <button class="btn theme-btn shadow-sm" id="themeToggle" title="Alternar Modo de Cor">
+                <i class="fas fa-sun fs-5" id="themeIcon"></i>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow-1">
+        <div class="container mt-5">
+            <div class="glass-wrapper mb-5 fade-in-up">
+                <div class="glass-card card-body text-center p-5">
+                    <h2 class="mb-3 fw-bold" style="color: #38bdf8;">Sincronização de Datos</h2>
+                    <p class="text-muted mb-5 fs-5"> Envie seu arquivo de log OBGE (.TXT) para iniciar a renderização.</p>
+                    
+                    <div id="uploadArea" class="upload-zone mx-auto" style="max-width: 600px;">
+                        <i class="fas fa-satellite upload-icon mb-4"></i>
+                        <h4 class="fw-bold">Arraste o arquivo TXT ou Clique Aqui</h4>
+                    </div>
+                    <input type="file" id="fileInput" accept=".txt" style="display: none;">
+                    
+                    <div id="fileInfo" class="mt-4" style="display: none;">
+                        <span class="badge badge-neon green p-3 fs-6">
+                            <i class="fas fa-check-circle me-2"></i> Sincronização Concluída com Sucesso
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container-fluid px-4 pb-5" id="contentArea" style="display: none;">
+            
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-4 mb-4">
+                <div class="col fade-in-up delay-1">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card stat-widget">
+                            <div class="stat-icon-wrapper"><i class="fas fa-route"></i></div>
+                            <div class="stat-info">
+                                <h6>Distância Total</h6>
+                                <h3 id="totalDistance">0.00 <span class="fs-6 text-muted">km</span></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col fade-in-up delay-1">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card stat-widget">
+                            <div class="stat-icon-wrapper time"><i class="fas fa-stopwatch"></i></div>
+                            <div class="stat-info">
+                                <h6>Tempo em Rota</h6>
+                                <h3 id="totalTime">0h 0m</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col fade-in-up delay-2">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card stat-widget">
+                            <div class="stat-icon-wrapper speed"><i class="fas fa-tachometer-fast"></i></div>
+                            <div class="stat-info">
+                                <h6>Vel. Média</h6>
+                                <h3 id="avgSpeed">0.0 <span class="fs-6 text-muted">km/h</span></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col fade-in-up delay-2">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card stat-widget">
+                            <div class="stat-icon-wrapper alt"><i class="fas fa-mountain"></i></div>
+                            <div class="stat-info">
+                                <h6>Altitude Média</h6>
+                                <h3 id="avgAltitude">0 <span class="fs-6 text-muted">m</span></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col fade-in-up delay-3">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card stat-widget">
+                            <div class="stat-icon-wrapper sat"><i class="fas fa-satellite"></i></div>
+                            <div class="stat-info">
+                                <h6>Média Satélites</h6>
+                                <h3 id="avgSatellites">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-lg-8 fade-in-up delay-2">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card d-flex flex-column">
+                            <div class="card-header-glass">
+                                <span class="fs-5"><i class="fas fa-map-marked-alt text-primary me-2"></i> Mapeamento do GPS</span>
+                                <button id="btnFullscreen" class="btn btn-sm btn-outline-primary rounded-pill px-4 py-2 fw-bold" style="transition: 0.3s;">
+                                    <i class="fas fa-expand me-1"></i> Tela Cheia
+                                </button>
+                            </div>
+                            <div id="mapWrapper" class="flex-grow-1" style="min-height: 500px;">
+                                <div id="map"></div>
+                                <button id="btnExitFullscreen" class="btn btn-danger shadow px-4 py-2 fw-bold rounded-pill align-items-center">
+                                    <i class="fas fa-compress me-2"></i> Sair da Tela Cheia
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 fade-in-up delay-3">
+                    <div class="glass-wrapper h-100">
+                        <div class="glass-card d-flex flex-column">
+                            <div class="card-header-glass">
+                                <span class="fs-5"><i class="fas fa-chart-line text-danger me-2"></i> Velocidades</span>
+                            </div>
+                            <div class="card-body position-relative flex-grow-1" style="min-height: 500px;">
+                                <canvas id="speedChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4 fade-in-up delay-3">
+                <div class="col-12">
+                    <div class="glass-wrapper">
+                        <div class="glass-card">
+                            <div class="card-header-glass">
+                                <span class="fs-5"><i class="fas fa-layer-group text-success me-2"></i> Alturas</span>
+                            </div>
+                            <div class="card-body position-relative" style="height: 380px;">
+                                <canvas id="altitudeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-5 fade-in-up delay-3">
+                <div class="col-12">
+                    <div class="glass-wrapper">
+                        <div class="glass-card">
+                            <div class="card-header-glass">
+                                <span class="fs-5"><i class="fas fa-server text-info me-2"></i> Todos os Registros</span>
+                            </div>
+                            <div class="table-responsive p-3" style="max-height: 550px; overflow-y: auto;">
+                                <table class="table table-custom table-borderless align-middle text-center mb-0">
+                                    <thead class="sticky-top" style="background: var(--glass-bg); backdrop-filter: blur(15px);">
+                                        <tr>
+                                            <th>ID</th><th>Horário</th><th>Lat</th><th>Lng</th>
+                                            <th>Velocidade</th><th>Altitude</th><th>Sinal GPS</th><th>Dist. Acumulada</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dataTable"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer-custom text-center">
+        <p class="mb-1 fw-bold" style="color: var(--text-muted); font-size: 1.1rem; letter-spacing: 1px;">Projeto OBGE</p>
+        <p class="mb-0" style="color: var(--text-muted); font-size: 0.9rem; opacity: 0.8;">Desenvolvido no Lab Maker IFPB Picuí</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <script>
+        let map = null, gpsLayerGroup = null;
+        let speedChartInstance = null, altitudeChartInstance = null;
+        let parsedPoints = [];
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const contentArea = document.getElementById('contentArea');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const btnFullscreen = document.getElementById('btnFullscreen');
+        const btnExitFullscreen = document.getElementById('btnExitFullscreen');
+
+        // ================= GESTÃO DE TEMAS E GRÁFICOS =================
+        function updateChartColors() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            const textColor = isDark ? '#f8fafc' : '#000000';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.15)';
+            
+            Chart.defaults.color = textColor;
+            Chart.defaults.borderColor = gridColor;
+            
+            function applyThemeToChart(chart) {
+                if (chart && chart.options && chart.options.scales) {
+                    chart.options.scales.x.ticks.color = textColor;
+                    chart.options.scales.x.grid.color = gridColor;
+                    chart.options.scales.y.ticks.color = textColor;
+                    chart.options.scales.y.grid.color = gridColor;
+                    chart.update();
+                }
+            }
+
+            applyThemeToChart(speedChartInstance);
+            applyThemeToChart(altitudeChartInstance);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            themeIcon.className = newTheme === 'dark' ? 'fas fa-sun fs-5' : 'fas fa-moon fs-5';
+            updateChartColors();
+        });
+
+        // ================= DRAG & DROP =================
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { uploadArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false); });
+        ['dragenter', 'dragover'].forEach(eventName => { uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover')); });
+        ['dragleave', 'drop'].forEach(eventName => { uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover')); });
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('drop', e => { if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]); });
+        fileInput.addEventListener('change', e => { if (e.target.files.length > 0) processFile(e.target.files[0]); });
+
+        // ================= TELA CHEIA MAPA =================
+        btnFullscreen.addEventListener('click', () => {
+            const mapWrapper = document.getElementById('mapWrapper');
+            if (!document.fullscreenElement) {
+                mapWrapper.requestFullscreen().then(() => setTimeout(() => map.invalidateSize(), 300));
+            }
+        });
+
+        btnExitFullscreen.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => { if (map) setTimeout(() => map.invalidateSize(), 300); });
+
+        // ================= PROCESSAMENTO DE ARQUIVO =================
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                parseOBGEData(e.target.result);
+                if (parsedPoints.length > 0) {
+                    fileInfo.style.display = 'block';
+                    contentArea.style.display = 'block';
+                    document.querySelectorAll('.fade-in-up').forEach(el => {
+                        el.style.animation = 'none'; el.offsetHeight; el.style.animation = null; 
+                    });
+                    setTimeout(atualizarInterface, 100);
+                } else {
+                    alert('Sincronização Falhou. Nenhum dado de telemetria válido detectado.');
+                }
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function parseOBGEData(text) {
+            parsedPoints = [];
+            const blocks = text.split(/------- DADOS DO OBGE -------/);
+            blocks.forEach(block => {
+                if (!block.trim()) return;
+                const latMatch = block.match(/\|\s*Lat:\s*([\d.-]+)/);
+                const lngMatch = block.match(/\|\s*Lng:\s*([\d.-]+)/);
+                const horaMatch = block.match(/\|\s*Hora:\s*(\d{2}:\d{2}:\d{2})/);
+                const satMatch = block.match(/\|\s*Satélites:\s*(\d+)/);
+                const velMatch = block.match(/\|\s*Velocidade:\s*([\d.-]+)/);
+                const altMatch = block.match(/\|\s*Altitude:\s*([\d.-]+)/);
+
+                if (latMatch && lngMatch) {
+                    const lat = parseFloat(latMatch[1]), lng = parseFloat(lngMatch[1]);
+                    const speed = velMatch ? parseFloat(velMatch[1]) : 0.0;
+                    const altitude = altMatch ? parseFloat(altMatch[1]) : 0.0;
+                    const satellites = satMatch ? parseInt(satMatch[1]) : 0;
+                    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                        parsedPoints.push({ lat, lng, hora: horaMatch ? horaMatch[1] : '--:--:--', satellites: isNaN(satellites) ? 0 : satellites, speed: isNaN(speed) ? 0.0 : speed, altitude: isNaN(altitude) ? 0.0 : altitude });
+                    }
+                }
+            });
+        }
+
+        function atualizarInterface() {
+            calcularEstatisticas();
+            inicializarMapa();
+            renderizarGraficos();
+            preencherTabela();
+        }
+
+        function calcularEstatisticas() {
+            let totalDist = 0, sumSat = 0, sumSpeed = 0, sumAlt = 0, altCount = 0;
+            for (let i = 0; i < parsedPoints.length; i++) {
+                sumSat += parsedPoints[i].satellites;
+                sumSpeed += parsedPoints[i].speed;
+                if (parsedPoints[i].altitude > 0) { sumAlt += parsedPoints[i].altitude; altCount++; }
+                if (i > 0) {
+                    const d = haversineDistance(parsedPoints[i - 1].lat, parsedPoints[i - 1].lng, parsedPoints[i].lat, parsedPoints[i].lng);
+                    if (d > 0.0005) totalDist += d;
+                }
+            }
+            let tempoTexto = "0h 0m";
+            if (parsedPoints.length > 1) {
+                const t1 = parseTimeToSeconds(parsedPoints[0].hora), t2 = parseTimeToSeconds(parsedPoints[parsedPoints.length - 1].hora);
+                let diff = t2 - t1; if (diff < 0) diff += 86400; 
+                tempoTexto = `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
+            }
+            document.getElementById('totalDistance').innerHTML = `${totalDist.toFixed(2)} <span class="fs-6 text-muted">km</span>`;
+            document.getElementById('totalTime').textContent = tempoTexto;
+            document.getElementById('avgSatellites').textContent = Math.round(sumSat / parsedPoints.length);
+            document.getElementById('avgSpeed').innerHTML = `${(sumSpeed / parsedPoints.length).toFixed(1)} <span class="fs-6 text-muted">km/h</span>`;
+            document.getElementById('avgAltitude').innerHTML = `${altCount > 0 ? Math.round(sumAlt / altCount) : 0} <span class="fs-6 text-muted">m</span>`;
+        }
+
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) ** 2;
+            return isNaN(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) ? 0 : R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function parseTimeToSeconds(h) {
+            if (!h || h === '--:--:--') return 0;
+            const p = h.split(':').map(Number); return p[0] * 3600 + p[1] * 60 + p[2];
+        }
+
+        // ================= MAPA (PONTOS AZUIS) =================
+        function inicializarMapa() {
+            const coords = parsedPoints.map(p => [p.lat, p.lng]);
+            const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+            if (map === null) {
+                map = L.map('map', { maxZoom: 19 }).setView(coords[0], 16);
+                L.tileLayer(tileUrl, { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+                gpsLayerGroup = L.layerGroup().addTo(map);
+            } else {
+                gpsLayerGroup.clearLayers();
+                map.eachLayer(layer => { if (layer instanceof L.TileLayer) layer.setUrl(tileUrl); });
+            }
+
+            const mapTraceColor = getComputedStyle(document.documentElement).getPropertyValue('--map-trace').trim();
+            const mapTraceGlowColor = getComputedStyle(document.documentElement).getPropertyValue('--map-trace-glow').trim();
+
+            L.polyline(coords, { color: mapTraceColor, weight: 5, opacity: 0.9, dashArray: '10, 10', lineJoin: 'round' }).addTo(gpsLayerGroup);
+
+            parsedPoints.forEach((p, idx) => {
+                const tooltip = `<div class="p-1"><b style="color: #38bdf8;">Registro: #${idx + 1}</b><br><b>Hora:</b> ${p.hora}<br><b>Vel:</b> ${p.speed.toFixed(1)} km/h<br><b>Alt:</b> ${p.altitude.toFixed(1)} m<br><b>Satélites:</b> ${p.satellites}</div>`;
+                
+                L.circleMarker([p.lat, p.lng], { 
+                    radius: 6, 
+                    color: mapTraceGlowColor, 
+                    fillColor: mapTraceColor, 
+                    fillOpacity: 1, 
+                    weight: 2 
+                })
+                .bindTooltip(tooltip, { sticky: true, className: 'leaflet-tooltip-own' }).addTo(gpsLayerGroup);
+            });
+            map.fitBounds(L.polyline(coords).getBounds(), { padding: [50, 50] });
+        }
+
+        function renderizarGraficos() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const textColor = isDark ? '#f8fafc' : '#000000';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.15)';
+            
+            const labels = parsedPoints.map(p => p.hora);
+            
+            if (speedChartInstance) speedChartInstance.destroy();
+            if (altitudeChartInstance) altitudeChartInstance.destroy();
+            
+            const ctxSpeed = document.getElementById('speedChart').getContext('2d');
+            let gradSpeed = ctxSpeed.createLinearGradient(0, 0, 0, 400);
+            gradSpeed.addColorStop(0, 'rgba(225, 29, 72, 0.4)');
+            gradSpeed.addColorStop(1, 'rgba(225, 29, 72, 0)');
+
+            speedChartInstance = new Chart(ctxSpeed, {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Velocidade (km/h)', data: parsedPoints.map(p => p.speed), borderColor: '#e11d48', backgroundColor: gradSpeed, fill: true, tension: 0.4, pointRadius: 0, pointHitRadius: 10 }] },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+
+            const ctxAlt = document.getElementById('altitudeChart').getContext('2d');
+            let gradAlt = ctxAlt.createLinearGradient(0, 0, 0, 300);
+            gradAlt.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+            gradAlt.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+            altitudeChartInstance = new Chart(ctxAlt, {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Elevação (m)', data: parsedPoints.map(p => p.altitude), borderColor: '#10b981', backgroundColor: gradAlt, fill: true, tension: 0.4, pointRadius: 0, pointHitRadius: 10 }] },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false }, 
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+        }
+
+        function preencherTabela() {
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = '';
+            let runDist = 0;
+            parsedPoints.forEach((p, idx) => {
+                if (idx > 0) { const d = haversineDistance(parsedPoints[idx-1].lat, parsedPoints[idx-1].lng, p.lat, p.lng); if (d > 0.0005) runDist += d; }
+                tbody.innerHTML += `<tr>
+                    <td class="fw-bold fs-5" style="color: #38bdf8;">#${idx + 1}</td>
+                    <td class="fw-bold">${p.hora}</td>
+                    <td class="text-muted">${p.lat.toFixed(6)}</td>
+                    <td class="text-muted">${p.lng.toFixed(6)}</td>
+                    <td><span class="badge badge-neon yellow">${p.speed.toFixed(1)} km/h</span></td>
+                    <td><span class="badge badge-neon green">${p.altitude.toFixed(0)} m</span></td>
+                    <td><span class="badge badge-neon blue">${p.satellites}</span></td>
+                    <td class="fw-bold">${runDist.toFixed(3)} km</td>
+                </tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
